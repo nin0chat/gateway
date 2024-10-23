@@ -8,9 +8,17 @@ import { ChatClient, MessageTypes, Payload, Role } from "../utils/types";
 
 export function receivedMessage(client: ChatClient, d: any) {
     const allowedCharacterLimit = client.roles! & Role.Guest ? 300 : 1000;
-    if (d.content.length > 2000)
+    if (d.content.length > allowedCharacterLimit)
         return sendError(client, 0, `Message too long, max is ${allowedCharacterLimit} characters`);
     if (!d.content || d.content.length === 0) return;
+	let to
+	if (d.dmTo) {
+		to = [...wss.clients as Set<ChatClient>].filter(s => s.id == d.dmTo)
+		if (!to.length) {
+			client.send('{ "op": -1, "d": { "message": "Cannot DM offline users" } }')
+			return
+		}
+	}
     const moderatedMessage =
         client.roles! & Role.Mod
             ? {
@@ -95,7 +103,20 @@ export function receivedMessage(client: ChatClient, d: any) {
         finalMessage.type = MessageTypes.Bridge;
     }
 
+	if (to) {
+		finalMessage.type = MessageTypes.IncomingDM
+		for (let recip of to) sendMessage(finalMessage, recip)
+		finalMessage.type = MessageTypes.OutgoingDM
+		finalMessage.userInfo = {
+		username: to[0].username!,
+		roles: to[0].roles!,
+			id: to[0].id!,
+			bridgeMetadata: {},
+		}
+		sendMessage(finalMessage, client)
+		} else {
     saveMessageToHistory(finalMessage);
     sendMessage(finalMessage);
+	}
     client.lastMessageTimestamp = Date.now();
 }
