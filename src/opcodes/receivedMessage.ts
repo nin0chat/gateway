@@ -85,8 +85,10 @@ export function receivedMessage(client: ChatClient, d: any) {
         timestamp: Date.now(),
         content: moderatedMessage.newMessageContent,
         id: generateID(),
-        device: client.device
+        device: client.device,
+		tag: {},
     };
+	if (typeof d.tag == "object") Object.assign(finalMessage.tag, d.tag)
     if (d.bridgeMetadata && client.roles! & Role.Mod) {
         finalMessage.userInfo = {
             id: client.id!,
